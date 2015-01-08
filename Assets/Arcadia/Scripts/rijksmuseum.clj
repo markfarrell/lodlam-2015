@@ -5,31 +5,34 @@
 
 (def api-key "WfTGhlrw")
 
-; Search params 
-(def year-from 1800)
-(def year-to 1943)
-(def art-type "painting")
+(def query "")
+(def results-per-page 100)
+(def imgonly true)
 
 (defn make-url
    "Make url to search for art."
-   [query]
+   [query year-from year-to page]
    (str "https://www.rijksmuseum.nl/api/nl/collection"
         "?key="
         api-key
         "&q="
         query
-        "&yearfrom"
+        "&yearfrom="
         year-from
         "&yearto="
         year-to
-        "&type="
-        art-type
+        "&p="
+        page
+        "&ps="
+        results-per-page
+        "&imgonly="
+        imgonly
         "&format=json"))
 
 (defn search
    "Search for art; wait until download is finished; produce JSON object."
-   [query]
-   (let [client (WWW. (make-url query))]
+   [query year-from year-to page]
+   (let [client (WWW. (make-url query year-from year-to page))]
       (do
          (some true? (repeatedly #(. client isDone)))) ; Wait to finish
          (json/read-str (. client text))))
@@ -56,15 +59,43 @@
    [search-result]
    (map get-texture-2d (thumbnail-urls search-result)))
 
-(defn make-painting!
-   "Expects a thumbnail; spawns a game object in the scene; produces the game object."
-   [thumbnail]
-   (let [painting (create-primitive :plane)]
-     (do 
-       (set! (. (. (. painting renderer) material) mainTexture)
-             thumbnail)
-       painting)))
+(defn set-main-texture! 
+   "Expects a GameObject; sets main texture."
+   [game-object texture]
+   (set! (. (. (. game-object renderer) material) mainTexture) 
+         texture))
 
+(defn aspect-ratio
+   "Expects a texture; produces its aspect ratio as a float."
+   [texture]
+   (float
+     (/ (. texture width)
+        (. texture height))))
+
+(defn adjust-scale!
+   "Scale GameObject based on aspect ratio of the texture."
+   [game-object texture]
+   (set! (. (. (. game-object transform) lossyScale) x) 
+         (aspect-ratio texture)))
+
+(defn random-thumbnail 
+   "Expects a search result; produces a random texture."
+   [search-result]
+   (get-texture-2d
+     (rand-nth (thumbnail-urls search-result))))
+
+(defcomponent Painting 
+   [^UnityEngine.Texture2D painting ^int year-from ^int year-to ^int page]
+   (Start [this] 
+     (do 
+        (set! (. this painting)
+              (random-thumbnail 
+                (search query year-from year-to page)))
+        (adjust-scale! this
+                       (. this painting))
+        (set-main-texture! this 
+                           (. this painting))))
+   (Update [this] ()))
 
 
 
