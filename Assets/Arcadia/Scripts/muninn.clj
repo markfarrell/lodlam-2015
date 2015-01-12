@@ -1,6 +1,5 @@
 (ns muninn
     (:use arcadia.core)
-    (:import [System.Web HttpUtility])
     (:import [UnityEngine Debug]))
 
 (defn url-encode
@@ -15,6 +14,14 @@
         (do
           (some true? (repeatedly #(. client isDone)))) ; Wait to finish
         client))
+
+(defn grid
+      "Create a width by height grid of points. e.g. (grid 2 2) => ([0 0] [0 1] [1 0] [1 1])"
+      [width height]
+      (mapcat (fn [i]
+                  (map (fn [j] [i j])
+                       (range height)))
+              (range width)))
 
 (defn set-main-texture!
       "Expects a GameObject; sets main texture."
