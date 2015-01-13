@@ -5,12 +5,13 @@
     (:import [UnityEngine Debug]))
 
 (def sparql-query
-     (str "select ?actor ?thumb ?birth {"
-          "  ?actor dbpedia-owl:occupation dbpedia:Actor ."
-          "  ?actor dbpedia-owl:birthDate ?birth ."
-          "  ?actor dbpedia-owl:thumbnail ?thumb ."
-          "  FILTER (?birth > \"1870-01-01\"^^xsd:date)"
-          "  FILTER (?birth < \"1925-01-01\"^^xsd:date)"
+     (str "select ?actor ?thumb ?start ?end {"
+          "?actor dbpedia-owl:occupation dbpedia:Actor ."
+          "?actor dbpedia-owl:activeYearsStartYear ?start ."
+          "?actor dbpedia-owl:activeYearsEndYear ?end ."
+          "?actor dbpedia-owl:thumbnail ?thumb ."
+          "FILTER (?start > \"1929-01-01\"^^xsd:date)"
+          "FILTER (?end < \"1945-01-01\"^^xsd:date)"
           "}"))
 
 (defn rand-thumbnail-url
@@ -25,7 +26,9 @@
       [game-object width height]
       (map (fn [[x y]]
                (instantiate game-object
-                            (UnityEngine.Vector3. (* 3.0 x) (* 3.0 y) 0.0)
+                            (UnityEngine.Vector3. (* 3.0 x)
+                                                  (* 3.0 y)
+                                                  0.0)
                             (UnityEngine.Quaternion/Euler 15.0 0 0)))
            (muninn/grid width height)))
 
