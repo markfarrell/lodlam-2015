@@ -2,7 +2,7 @@
 
 @title{Muninn Project}
 
-@section{Rijksmuseum}
+@section{Retrieving Historical Art from the Rijksmuseum}
 
 The @hyperlink["https://www.rijksmuseum.nl/" "Rijksmuseum"] is a national historical art museum
 located in Amsterdam. They provide a public API for retrieving art objects in their collection,
@@ -11,7 +11,7 @@ There's close to one million art objects made available by the Rijksmuseum. We'd
 generate historical art exhibits with the Rijksmuseum collection.
 
 Let's narrow down our search. As an example, we'll look at art produced between 1845 and 1945.
-Also, we're only interested in displaying prints in our scenes, even though the Rijksmuseum offers historical photos.
+Also, we're only interested in displaying prints in our exhibits, even though the Rijksmuseum offers historical photos.
 We could send a @italic{GET} request with the following URL to retrieve the first piece of art that satisfies
 these constraints:
 
@@ -61,7 +61,7 @@ these constraints:
        0
        (call/input-url (string->url string)
                        (lambda (u [h '()]) (get-pure-port u h #:redirections 5))
-                       (λ (port)
+                       (lambda (port)
                          (make-object bitmap% port 'unknown/alpha #f #t)))))
 
     (define (rijksmuseum/make-url year-from year-to results-per-page page)
@@ -115,9 +115,9 @@ these constraints:
     (require racket/pretty)
     (current-print pretty-print-handler)))
 
-@(interaction
-  #:eval ev
-  (rijksmuseum/make-url 1845 1945 1 1))
+@verbatim{
+  https://www.rijksmuseum.nl/api/en/collection?key=WfTGhlrw&q=&yearfrom=1845&yearto=1945&p=1&ps=1&imgonly=True&type=print&format=json
+}
 
 You might be wondering, how many of the Rijkmuseum's art objects were produced between these years?
 
@@ -126,13 +126,29 @@ You might be wondering, how many of the Rijkmuseum's art objects were produced b
   (rijksmuseum/count 1845 1945))
 
 There is a fair volume of historical art to examine between those years. We'd like
-to show samples of this historical art when the scene is played:
+to display samples of this historical art in our exhibits:
 
 @(interaction
   #:eval ev
   (rijksmuseum/sample 1845 1945))
 
-@section{Film Stars}
+We've been playing with @hyperlink["http://unity3d.com/" "Unity3d"], a game engine; we've made
+a picture frame asset that retrieves and displays a sample of historical art when the scene that
+it is placed in is played. A repository containing that asset can be found
+@hyperlink["https://github.com/markfarrell/muninn" "here"].
+
+@image["unity_rijksmuseum.png" #:scale 0.5]
+@image["unity_rijksmuseum_2.png"]
+
+@section{Retrieving Historical Photos of Film Stars using DBpedia}
+
+We can use @hyperlink["http://dbpedia.org/About" "DBpedia"] to retrieve
+historical photos of film stars - and display them in procedurally generated
+historical exhibits. This @hyperlink[
+  "http://www.annefrank.org/en/Museum/Collecties/Movie-star-pictures/"
+  "article"
+] from Anne Frank's House motivates us to be able to retrieve film star photos
+and display them in procedurally generated exhibits of family houses.
 
 @(interaction-eval
   #:eval ev
@@ -161,41 +177,41 @@ to show samples of this historical art when the scene is played:
   #:eval ev
   (begin
     (define (film-stars/sparql-query year-from year-to)
-      (string-append "select ?actor ?name ?thumb ?start ?end ?active {"
-                     "?actor dbpedia-owl:occupation dbpedia:Actor ."
-                     "?actor foaf:name ?name ."
-                     "?actor dbpedia-owl:thumbnail ?thumb ."
-                     "?actor dbpedia-owl:activeYearsStartYear ?start ."
-                     "?actor dbpedia-owl:activeYearsEndYear ?end ."
-                     "?actor dbpprop:yearsActive ?active ."
-                     "FILTER (?start >= \""
-                     (number->string year-from)
-                     "-01-01\"^^xsd:date)"
-                     "FILTER (?end <= \""
-                     (number->string year-to)
-                     "-01-01\"^^xsd:date)"
-                     "FILTER (?active <= \""
-                     (number->string year-to)
-                     "\"^^xsd:integer)"
-                     "}"))
+       (string-append "PREFIX wordnet: <http://www.w3.org/2006/03/wn/wn20/instances/>"
+                      "SELECT DISTINCT ?actor ?thumb ?start {"
+                      "  {"
+                      "    ?actor dbpprop:wordnet_type wordnet:synset-actor-noun-1 ."
+                      "  } UNION {"
+                      "    ?actor dbpedia-owl:occupation dbpedia:Actor ."
+                      "  }"
+                      "  ?actor dbpedia-owl:thumbnail ?thumb ."
+                      "  ?actor dbpedia-owl:activeYearsStartYear ?start ."
+                      "  FILTER (?start > \"" (number->string year-from) "-01-01\"^^xsd:date)"
+                      "  FILTER (?start < \"" (number->string year-to) "-01-01\"^^xsd:date)"
+                      "  FILTER EXISTS {"
+                      "    {"
+                      "     ?film dbpedia-owl:starring ?actor ."
+                      "    } UNION {"
+                      "      ?film dbpprop:starring ?actor ."
+                      "    }"
+                      "  }"
+                      "}"))
 
     (define (film-stars/actors year-from year-to)
       (hash-ref (hash-ref (get/json (dbpedia/make-url (film-stars/sparql-query year-from year-to)))
                           'results)
                 'bindings))
 
+    (define (film-stars/count year-from year-to)
+      (length (film-stars/actors year-from year-to)))
+
     (define (film-stars/display-actor actor-object)
       (above/align "left"
                    (bitmap/url+redirection
                     (hash-ref (hash-ref actor-object 'thumb)
                               'value))
-                   (text (hash-ref (hash-ref actor-object 'name)
+                   (text (hash-ref (hash-ref actor-object 'actor)
                                    'value)
-                         12
-                         "Black")
-                   (text (string-append "Active "
-                                        (hash-ref (hash-ref actor-object 'active)
-                                                  'value))
                          12
                          "Black")))
 
@@ -203,12 +219,69 @@ to show samples of this historical art when the scene is played:
       (film-stars/display-actor
        (select-random (film-stars/actors year-from year-to))))))
 
+Let's look at film stars who were active while Anne Frank was alive (1929 - 1945).
+Here's a @hyperlink[
+  "http://www.w3.org/TR/2013/REC-sparql11-query-20130321/SPARQL"
+  "SPARQL"
+] query to retrieve film stars who were active during that time period:
+
+@verbatim{
+
+  PREFIX wordnet: <http://www.w3.org/2006/03/wn/wn20/instances/>
+
+  SELECT DISTINCT ?actor ?thumb ?start {
+
+    {
+      ?actor dbpprop:wordnet_type wordnet:synset-actor-noun-1 .
+    } UNION {
+      ?actor dbpedia-owl:occupation dbpedia:Actor .
+    }
+
+    ?actor dbpedia-owl:thumbnail ?thumb .
+    ?actor dbpedia-owl:activeYearsStartYear ?start .
+
+    FILTER (?start > "1900-01-01"^^xsd:date)
+    FILTER (?start < "1945-01-01"^^xsd:date)
+
+    FILTER EXISTS {
+      {
+        ?film dbpedia-owl:starring ?actor .
+      } UNION {
+        ?film dbpprop:starring ?actor .
+      }
+    }
+
+  }
+
+}
+
+We can execute that SPARQL query and retrieve the results by sending a @italic{GET}
+request to DBpedia's SPARQL endpoint:
+
+@verbatim{
+  http://dbpedia.org/sparql?default-graph-uri=http%3A%2F%2Fdbpedia.org&format=json&timeout=30000&debug=on&query=???
+}
+
+@italic{Note: we'd set the query parameter to be our SPARQL query.}
+
+How many film stars were active during that time period?
+
 @interaction[
   #:eval ev
-  (film-stars/sample 1929 1945)
+  (film-stars/count 1900 1945)
 ]
 
-@section{Family Photos}
+That's quite a number of film stars. Let's have a look at example of a film star
+photo that we could place in our procedurally generated historical exhibit:
 
-@section{Flickr}
+@interaction[
+  #:eval ev
+  (film-stars/sample 1900 1945)
+]
+
+One problem is that some photos of film stars are modern, and would look
+out of place in our exhibits. We could check if the photos are greyscale
+before displaying them.
+
+@image{unity_film_stars.png}
 

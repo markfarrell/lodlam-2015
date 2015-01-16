@@ -7,17 +7,18 @@
 (def api-key "WfTGhlrw")
 
 (def query "")
-(def results-per-page 100)
-(def imgonly true)
+(def results-per-page 1)
+(def img-only "True")
+(def art-type "print")
 
 (defn make-url
       "Make url to search for art."
-      [query year-from year-to page]
-      (str "https://www.rijksmuseum.nl/api/nl/collection"
+      [year-from year-to page]
+      (str "https://www.rijksmuseum.nl/api/en/collection"
            "?key="
            api-key
            "&q="
-           (muninn/url-encode query)
+           query
            "&yearfrom="
            year-from
            "&yearto="
@@ -27,13 +28,15 @@
            "&ps="
            results-per-page
            "&imgonly="
-           imgonly
+           img-only
+           "&type="
+           art-type
            "&format=json"))
 
 (defn search
       "Search for art; wait until download is finished; produce JSON object."
-      [query year-from year-to page]
-      (let [url (make-url query year-from year-to page)]
+      [year-from year-to page]
+      (let [url (make-url year-from year-to page)]
         (json/read-str (. (muninn/GET url) text))))
 
 (defn thumbnail-urls
@@ -62,18 +65,16 @@
         (/ (. texture width)
            (. texture height))))
 
-(defn random-thumbnail
-      "Expects a search result; produces a random texture."
-      [search-result]
-      (get-texture-2d
-        (rand-nth (thumbnail-urls search-result))))
-
 (defcomponent Painting
-              [^UnityEngine.Texture2D painting ^int year-from ^int year-to ^int page]
+              [^UnityEngine.Texture2D painting ^int year-from ^int year-to]
               (Start [this]
-                     (do
-                       (set! (. this painting)
-                         (random-thumbnail
-                           (search query year-from year-to page)))
-                       (muninn/set-main-texture! this (. this painting))))
-              (Update [this] ()))
+                     (let [page 1
+                           search-result (search year-from year-to page)
+                           count (second (find search-result "count"))]
+                       (do
+                         (set! (. this painting)
+                               (get-texture-2d (first (thumbnail-urls
+                                 (search year-from
+                                         year-to
+                                         (rand-int (+ 1 count)))))))
+                         (muninn/set-main-texture! this (. this painting))))))
