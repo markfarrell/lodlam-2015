@@ -4,16 +4,25 @@
 
 @section{Retrieving Historical Art from the Rijksmuseum}
 
+The Muninn Project aims to statistically recreate scenes of historical events using
+@hyperlink["http://lod-cloud.net/" "Linked Open Data"]. Historical art is rich with
+information important to the study of politics and human culture - but there is so
+much historical art to examine that it becomes difficult to devote sufficient attention
+to each individual piece of art. @italic{So, how might we resolve this problem of "information
+overload"?} If we statistically recreate scenes of historical events, and retrieve relevant
+art to display in them, we argue that analysis of the art becomes easier with the additional
+historical context provided by the scene. @italic{Let's try this.}
+
 The @hyperlink["https://www.rijksmuseum.nl/" "Rijksmuseum"] is a national historical art museum
 located in Amsterdam. They provide a public API for retrieving art objects in their collection,
 which you can read more about @hyperlink["https://www.rijksmuseum.nl/en/api" "here"].
-There's close to one million art objects made available by the Rijksmuseum. We'd like to procedurally
-generate historical art exhibits with the Rijksmuseum collection.
+There's close to one million art objects made available by the Rijksmuseum. We can narrow down
+our search for historical art: we'll try to sample only the art that best fits the context
+of our recreated historical scenes.
 
-Let's narrow down our search. As an example, we'll look at art produced between 1845 and 1945.
-Also, we're only interested in displaying prints in our exhibits, even though the Rijksmuseum offers historical photos.
-We could send a @italic{GET} request with the following URL to retrieve the first piece of art that satisfies
-these constraints:
+As an example, we'll retrieve art from the Rijksmuseum produced between 1845 and 1945 to display
+in a scene of a historical event that took place during that time period. We could send a @italic{GET}
+request with the following URL to retrieve the first piece of art that satisfies this constraint:
 
 @(require racket/sandbox
           net/url
@@ -119,36 +128,57 @@ these constraints:
   https://www.rijksmuseum.nl/api/en/collection?key=WfTGhlrw&q=&yearfrom=1845&yearto=1945&p=1&ps=1&imgonly=True&type=print&format=json
 }
 
+@italic{Note that:} we've also restricted the type of art that we retrieve; we're only retrieving prints, even though
+the Rijksmuseum also provides photos. We'll begin to look at historical photos to display in our scenes in a future blog post.
+The Rijksmuseum may or may not be the best source for photos, though they certainly provide very high quality images of prints
+that are important to Dutch history. Calls to the Rijksmuseum API return a @hyperlink["http://www.json.org/" "JSON"] object, listing
+the titles of art that match our search parameters, and links to images of them.
+
+@italic{Let's look at the art objects that match our search parameters.}
 You might be wondering, how many of the Rijkmuseum's art objects were produced between these years?
 
 @(interaction
   #:eval ev
   (rijksmuseum/count 1845 1945))
 
-There is a fair volume of historical art to examine between those years. We'd like
-to display samples of this historical art in our exhibits:
+There is a fair volume of historical art to examine between those years. @italic{So, what might
+a sample of that art look like?}
 
 @(interaction
   #:eval ev
   (rijksmuseum/sample 1845 1945))
 
+This sample of historical art is of Japanese origin. Most of the Rijkmuseum art is not of East Asian origin,
+though they keep a small collection. We might wish to restrict the art we sample by the geographical location
+that our historical scenes take place in. This is possible with the Rijksmuseum API, but only approximately, by
+modern or historic country.
+
 We've been playing with @hyperlink["http://unity3d.com/" "Unity3d"], a game engine; we've made
 a picture frame asset that retrieves and displays a sample of historical art when the scene that
 it is placed in is played. A repository containing that asset can be found
-@hyperlink["https://github.com/markfarrell/muninn" "here"].
+@hyperlink["https://github.com/markfarrell/muninn" "here"]. The script that retrieves art from the
+Rijksmuseum was written in @hyperlink["http://clojure.org/" "Clojure"], with the new
+@hyperlink["http://arcadia-unity.tumblr.com/" "Arcadia"] plugin; we hope to explore how the
+functional programming paradigm might help us further progress on the Muninn project.
 
 @image["unity_rijksmuseum.png" #:scale 0.5]
 @image["unity_rijksmuseum_2.png"]
 
+We hope to retrieve art from the Rijksmuseum and place it in our statistically recreated scenes of historical events.
+The Unity3d asset that we have created facilitates this: we need to make more progress on statistically building the structure
+of our scenes, but we are now able to populate picture frames with art in our scenes once we have determined where they
+should be placed. It would be nice to display a description of the art to the viewer, to aid the analysis of the art
+in the context of the scene. Stay tuned for more information on this endeavour!
+
 @section{Retrieving Historical Photos of Film Stars using DBpedia}
 
-We can use @hyperlink["http://dbpedia.org/About" "DBpedia"] to retrieve
-historical photos of film stars - and display them in procedurally generated
-historical exhibits. This @hyperlink[
+This is a follow-up to the previous blog post on retrieving historical art from the Rijksmuseum.
+We can use @hyperlink["http://dbpedia.org/About" "DBpedia"] to retrieve historical photos of film stars.
+This @hyperlink[
   "http://www.annefrank.org/en/Museum/Collecties/Movie-star-pictures/"
   "article"
-] from Anne Frank's House motivates us to be able to retrieve film star photos
-and display them in procedurally generated exhibits of family houses.
+] from the Anne Frank House motivates us to be able to retrieve film star photos and display them in our
+statistically generated scenes of historical events.
 
 @(interaction-eval
   #:eval ev
@@ -226,23 +256,17 @@ Here's a @hyperlink[
 ] query to retrieve film stars who were active during that time period:
 
 @verbatim{
-
   PREFIX wordnet: <http://www.w3.org/2006/03/wn/wn20/instances/>
-
   SELECT DISTINCT ?actor ?thumb ?start {
-
     {
       ?actor dbpprop:wordnet_type wordnet:synset-actor-noun-1 .
     } UNION {
       ?actor dbpedia-owl:occupation dbpedia:Actor .
     }
-
     ?actor dbpedia-owl:thumbnail ?thumb .
     ?actor dbpedia-owl:activeYearsStartYear ?start .
-
     FILTER (?start > "1900-01-01"^^xsd:date)
     FILTER (?start < "1945-01-01"^^xsd:date)
-
     FILTER EXISTS {
       {
         ?film dbpedia-owl:starring ?actor .
@@ -250,9 +274,7 @@ Here's a @hyperlink[
         ?film dbpprop:starring ?actor .
       }
     }
-
   }
-
 }
 
 We can execute that SPARQL query and retrieve the results by sending a @italic{GET}
@@ -279,9 +301,19 @@ photo that we could place in our procedurally generated historical exhibit:
   (film-stars/sample 1900 1945)
 ]
 
-One problem is that some photos of film stars are modern, and would look
-out of place in our exhibits. We could check if the photos are greyscale
-before displaying them.
+There are a couple of problems with retrieving film star photos usings DBpedia.
+
+One problem is that some photos of film stars are modern, and would look out of place in our exhibits.
+We could check if the photos are greyscale before displaying them.
+
+Another problem is that there isn't information available about when some film stars were active,
+e.g. @hyperlink["http://dbpedia.org/page/Sonja_Henie" "Sonja Henie"] as mentioned in the article
+from the Anne Frank House; this means that they are
+not included in the result of our SPARQL query. It might be possible to use the release dates of
+the films that actors/actresses starred in as a proxy for information on when they were active.
 
 @image{unity_film_stars.png}
 
+We've made a Unity3d picture frame asset that retrieves a random film star photo from DBpedia
+and displays it when the scene that it is placed in is played. The asset is available in this
+repository. Stay tuned for more on statistically generated historical scenes!
