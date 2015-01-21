@@ -173,12 +173,9 @@ in the context of the scene. Stay tuned for more information on this endeavour!
 @section{Retrieving Historical Photos of Film Stars using DBpedia}
 
 This is a follow-up to the previous blog post on retrieving historical art from the Rijksmuseum.
-We can use @hyperlink["http://dbpedia.org/About" "DBpedia"] to retrieve historical photos of film stars.
-This @hyperlink[
-  "http://www.annefrank.org/en/Museum/Collecties/Movie-star-pictures/"
-  "article"
-] from the Anne Frank House motivates us to be able to retrieve film star photos and display them in our
-statistically generated scenes of historical events.
+Like historical art, film star photos inform us about politics and human culture at particular
+times throughout history. We can use @hyperlink["http://dbpedia.org/About" "DBpedia"] to retrieve
+historical photos of film stars and display them in our statistically generated scenes of historical events.
 
 @(interaction-eval
   #:eval ev
@@ -249,7 +246,7 @@ statistically generated scenes of historical events.
       (film-stars/display-actor
        (select-random (film-stars/actors year-from year-to))))))
 
-Let's look at film stars who were active while Anne Frank was alive (1929 - 1945).
+As an example, let's look at film stars who were active while Anne Frank was alive (1929 - 1945).
 Here's a @hyperlink[
   "http://www.w3.org/TR/2013/REC-sparql11-query-20130321/SPARQL"
   "SPARQL"
@@ -307,7 +304,8 @@ One problem is that some photos of film stars are modern, and would look out of 
 We could check if the photos are greyscale before displaying them.
 
 Another problem is that there isn't information available about when some film stars were active,
-e.g. @hyperlink["http://dbpedia.org/page/Sonja_Henie" "Sonja Henie"] as mentioned in the article
+e.g. @hyperlink["http://dbpedia.org/page/Sonja_Henie" "Sonja Henie"] as mentioned in this
+@hyperlink["http://www.annefrank.org/en/Museum/Collecties/Movie-star-pictures/" "article"]
 from the Anne Frank House; this means that they are
 not included in the result of our SPARQL query. It might be possible to use the release dates of
 the films that actors/actresses starred in as a proxy for information on when they were active.
