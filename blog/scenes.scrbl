@@ -17,7 +17,15 @@ decide the historical context of a scene before generating, e.g. date and
 geographical location.
 
 We'll look at Flickr photos, and determine the possible structures of house
-scenes.
+scenes; but before finding examples of house interiors on Flickr, let's
+just talk about how we might statistically construct a wall with objects on it.
+A wall is rectangular, and we'll arrange objects that have rectangular bounding
+boxes on it. We need to know the dimensions of our wall, how many objects we wish
+to place on it, and their dimensions. Let's try packing our rectangular objects, and
+scale them apart from the center of the wall, to best fit the dimensions of the
+larger wall. Following a previous post titled @italic{Retrieving Historical Art from
+the Rijksmuseum}: we'll retrieve two samples of historical art from the Rijksmuseum,
+pack them, and then illustrate packing four samples, and so on.
 
 @bibliography[
   @bib-entry[
