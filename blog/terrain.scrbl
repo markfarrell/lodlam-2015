@@ -1,4 +1,4 @@
-#lang scribble/manual
+#lang scribble/sigplan
 
 @section{Loading and Displaying Elevation Data from the Shuttle Radar Topography Mission}
 
@@ -27,7 +27,10 @@ the geographical location of the camera in our scenes.
 
 @interaction-eval[
   #:eval ev
-  (require json)
+  (begin
+    (require json)
+    (require net/url)
+    (require file/unzip))
 ]
 
 @interaction[
@@ -54,13 +57,31 @@ the geographical location of the camera in our scenes.
 
 @interaction[
   #:eval ev
-  (define (SRTM-make-url srtm)
-    (string-append "http://gis-lab.info/data/srtm-tif/"
-                   (SRTM-filename srtm)
-                   ".zip"))
+  (define (make-gdal-translate srtm)
+    (λ (dir)
+       (system (string-append "gdal_translate -ot UInt16 -scale -of ENVI -outsize 1025 1025 "
+                      (path->string dir)
+                      "/"
+                      (SRTM-filename srtm)
+                      ".tif "
+                      "data/"
+                      (SRTM-filename srtm)
+                      ".raw"))))
 ]
 
 @interaction[
   #:eval ev
-  (map SRTM-make-url SRTMs)
+  (define (SRTM-download srtm)
+    (let* ([url-prefix "http://gis-lab.info/data/srtm-tif/"]
+           [url-path (string-append url-prefix (SRTM-filename srtm) ".zip")]
+           [url (string->url url-path)]
+           [gdal-translate (make-gdal-translate srtm)])
+    (call-with-unzip (get-pure-port url #:redirections 1)
+                     gdal-translate)))
 ]
+
+@interaction[
+  #:eval ev
+  (map SRTM-download SRTMs)
+]
+
