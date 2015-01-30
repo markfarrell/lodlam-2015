@@ -99,16 +99,16 @@ behind the camera. It would be efficient to use a @hyperlink[
                                     (SRTM-file-name srtm)
                                     ".tif ")])
             (begin
-               (system (string-append "cp -f "
-                                      geotiff
-                                      "data/"))
-               (system (string-append "gdal_translate -q -ot UInt16 -scale -of ENVI -outsize 1025 1025 "
-                                      "data/"
-                                      (SRTM-file-name srtm)
-                                      ".tif "
-                                      "data/"
-                                      (SRTM-file-name srtm)
-                                      ".raw"))))))
+              (system (string-append "cp -f "
+                                     geotiff
+                                     "data/"))
+              (system (string-append "gdal_translate -q -ot UInt16 -of ENVI -scale -outsize 4097 4097 "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     ".tif "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     ".raw"))))))
 ]
 
 @interaction-eval[
@@ -123,11 +123,6 @@ behind the camera. It would be efficient to use a @hyperlink[
 ]
 
 @interaction-eval[
- #:eval ev
- (SRTM-download (first SRTMs))
-]
-
-@interaction-eval[
   #:eval ev
   (define (SRTM-contains? x y)
     (λ (srtm)
@@ -137,10 +132,49 @@ behind the camera. It would be efficient to use a @hyperlink[
             (> (SRTM-y-max srtm) y))))
 ]
 
-@interaction[
+@interaction-eval[
   #:eval ev
   (map SRTM-download
        (filter (SRTM-contains? 2.774 50.379)
-              SRTMs))
+               SRTMs))
 ]
+
+Whenever we import terrain into Unity3D, we need to make sure that it is
+scaled correctly: i.e. Vimy Ridge should look correctly-scaled when
+viewed through the camera in our scene. Our camera has a perspective projection;
+it nas near and far clipping planes on the z-axis in Unity3d. Let's define
+values for the near and far clipping planes of our camera:
+
+@interaction[
+  #:eval ev
+  (define-values (near far)
+    (values 0.3 1000))
+]
+
+These values are defined with respect to Unity3d's gridded coordinate system,
+the origin of its z-axis having the value 0; this is not the same coordinate
+system as WGS84 and geographical coordinates in decimal degrees. We'll
+have to project our elevation data to fit Unity3d's coordinate system, before
+we fix it's scale and orientation relative to the size of our camera's view.
+The @hyperlink[
+  "http://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system"
+  "Universal Transverse Mercator coordinate system"
+] let's us do just that: project from geographical coordinates, i.e. longitude
+-latitude coordinates, to two-dimensional Cartesian coordinates. It's possible to
+use GDAL to do the projection, but we could just do the math ourselves. If we want
+to setup a service that let's us request elevation data for any bounding box, not
+just predefined SRTM chunks, then we should probably do the projection ourselves
+after retrieving elevation data inside our bounding box.
+
+@section{A Service for Retrieving Elevation Data in a Bounding Box}
+
+As mentioned, we'd like to have a service to retrieve the elevation data inside
+a bounding box. Not only do we want to retrieve elevation data inside a bounding box,
+but we also want to scale, rotate and project it so that our terrain in Unity3d looks
+the same as it would in real life. @italic{Ok}, so SRTM chunks are
+6000 by 6000 pixels wide, where each point is 90 metres apart. Ideally, we want elevation
+data that is accurate within one metre; this happens to be the minimum width of a
+trench. However, SRTM is the best we have right now, but we'll scale it to 90 times
+its original resolution, so that elevation data that is returned from a request
+appears to be to scale.
 
