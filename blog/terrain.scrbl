@@ -96,19 +96,21 @@ behind the camera. It would be efficient to use a @hyperlink[
     (λ (dir)
        (let ([geotiff (string-append (path->string dir)
                                      "/"
-                                    (SRTM-file-name srtm)
-                                    ".tif ")])
+                                     (SRTM-file-name srtm)
+                                     ".tif ")])
             (begin
               (system (string-append "cp -f "
                                      geotiff
                                      "data/"))
-              (system (string-append "gdal_translate -q -ot UInt16 -of ENVI -scale -outsize 4097 4097 "
+              (system (string-append "gdal_translate -q -ot Byte -of BMP "
+                                     " -scale 0 256 "
+                                     "-outsize 513 513 "
                                      "data/"
                                      (SRTM-file-name srtm)
                                      ".tif "
                                      "data/"
                                      (SRTM-file-name srtm)
-                                     ".raw"))))))
+                                     ".bmp"))))))
 ]
 
 @interaction-eval[
@@ -177,4 +179,23 @@ data that is accurate within one metre; this happens to be the minimum width of 
 trench. However, SRTM is the best we have right now, but we'll scale it to 90 times
 its original resolution, so that elevation data that is returned from a request
 appears to be to scale.
+
+Before we are able to retrieve only the elevation data that lies inside a bounding box,
+we need to be able to test for all of the SRTM chunks that have elevation data inside a
+bounding box. This is straight-forward enough, but we need to do it before projecting,
+while still in our geographical coordinate system. Each bounding box has a minimum and
+maximum geographical coordinate, and we need to be able to test for geographical
+coordinates that lie inside a bounding box. If the angle between the minimum coordinate and
+the coordinate that we are trying to test is inside our bounding box is less than the
+angle between the minimum coordinate and maximum coordinate, then the point is inside
+our bounding box.
+
+@hyperlink["http://en.wikipedia.org/wiki/Vincenty%27s_formulae" "Vincenty Formula"]
+
+@interaction[
+  #:eval ev
+  (begin
+    (define a 6378137.0)
+    (define ƒ 1/298.257223563))
+]
 
