@@ -196,6 +196,114 @@ our bounding box.
   #:eval ev
   (begin
     (define a 6378137.0)
-    (define ƒ 1/298.257223563))
+    (define ƒ (/ 1 298.257223563))
+    (define b 6356752.314245))
 ]
 
+@interaction[
+  #:eval ev
+  (define (reduced-latitude φ)
+    (atan (* (- 1 ƒ)
+             (tan φ))))
+]
+
+@interaction[
+  #:eval ev
+  (define-values (φ1 L1)
+    (values (degrees->radians 50.379)
+            (degrees->radians 2.774)))
+]
+
+@interaction[
+  #:eval ev
+  (define-values (φ2 L2)
+    (values (degrees->radians 0.0)
+            (degrees->radians 0.0)))
+]
+
+@interaction-eval[
+  #:eval ev
+  (define L (- L1 L2))
+]
+
+@interaction-eval[
+  #:eval ev
+  (define precision 0.000000000006)
+]
+
+@interaction-eval[
+  #:eval ev
+  (define (λ-prime λ)
+    (let* ([U1 (reduced-latitude φ1)]
+           [U2 (reduced-latitude φ2)]
+           [sinσ (sqrt (+ (expt (* (cos U2)
+                                   (sin λ))
+                                2)
+                          (expt (- (* (cos U1)
+                                      (sin U2))
+                                   (* (sin U1)
+                                      (cos U2)
+                                      (cos λ)))
+                                2)))]
+            [cosσ (+ (* (sin U1)
+                        (sin U2))
+                     (* (cos U1)
+                        (cos U2)
+                        (cos λ)))]
+            [σ (atan (/ sinσ cosσ))]
+            [sinα (/ (* (cos U1)
+                        (cos U2)
+                        (sin λ))
+                     sinσ)]
+            [cosα2 (- 1
+                      (expt sinα 2))]
+            [cos2σm (- cosσ
+                       (/ (* 2
+                             (sin U1)
+                             (sin U2))
+                           cosα2))]
+            [C (* (/ ƒ 16)
+                  cosα2
+                  (+ 4
+                     (* ƒ
+                        (- 4
+                           (* 3 cosα2)))))])
+          (+ λ
+             (* (- 1 C)
+                ƒ
+                sinα
+                (+ σ
+                   (* C
+                      sinσ
+                      (+ cos2σm
+                         (* C
+                            cosσ
+                            (+ -1
+                               (* 2
+                                  (expt cos2σm 2)))))))))))
+]
+
+@interaction-eval[
+  #:eval ev
+  (begin
+    (require racket/generator)
+    (define stop-value (gensym))
+    (define λ-generator
+      (generator ()
+        (let loop
+             ([diff precision]
+              [λ L])
+             (if (< diff precision)
+                 stop-value
+                 (let ([λ-prime (λ-prime λ)])
+                      (begin
+                        (yield λ-prime)
+                        (loop  (- λ-prime λ)
+                               λ-prime))))))))
+
+]
+
+@interaction[
+  #:eval ev
+  (for/last ([i (in-producer λ-generator stop-value)]) i)
+]
