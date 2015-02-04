@@ -40,7 +40,7 @@ bounding boxes of SRTM chunks. I converted this file back to
 @hyperlink["http://jeffpaine.github.io/geojson-topojson/" "GeoJSON"] format to be able to
 retrieve chunks of SRTM data nearest to a geographical coordinate. By default, GeoJSON files
 describe geographical coordinates, i.e. longitude-latitude pairs, in decimal
-degrees; they use the WGS84 datum as well. Let's load the file and extract the names of SRTM chunks,
+degrees; they use the WGS84 spheroid as well. Let's load the file and extract the names of SRTM chunks,
 as well as their bounding boxes.
 
 @interaction-eval[
@@ -157,7 +157,7 @@ These values are defined with respect to Unity3d's gridded coordinate system,
 the origin of its z-axis having the value 0; this is not the same coordinate
 system as WGS84 and geographical coordinates in decimal degrees. We'll
 have to project our elevation data to fit Unity3d's coordinate system, before
-we fix it's scale and orientation relative to the size of our camera's view.
+we fix its scale and orientation relative to the size of our camera's view.
 The @hyperlink[
   "http://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system"
   "Universal Transverse Mercator coordinate system"
@@ -180,19 +180,16 @@ trench. However, SRTM is the best we have right now, but we'll scale it to 90 ti
 its original resolution, so that elevation data that is returned from a request
 appears to be to scale.
 
-Before we are able to retrieve only the elevation data that lies inside a bounding box,
-we need to be able to test for all of the SRTM chunks that have elevation data inside a
-bounding box. This is straight-forward enough, but we need to do it before projecting,
-while still in our geographical coordinate system. Each bounding box has a minimum and
-maximum geographical coordinate, and we need to be able to test for geographical
-coordinates that lie inside a bounding box. If the angle between the minimum coordinate and
-the coordinate that we are trying to test is inside our bounding box is less than the
-angle between the minimum coordinate and maximum coordinate, then the point is inside
-our bounding box.
+@section{Testing that Chunks of Elevation Data are in our Camera's Field of View}
 
-@hyperlink["http://en.wikipedia.org/wiki/Vincenty%27s_formulae" "Vincenty Formula"]
+We can use @hyperlink["http://en.wikipedia.org/wiki/Vincenty%27s_formulae" "Vincenty's Formula"] to
+compute the ellipsoidal distance between two geographical coordinates on the Earth, the WGS84 spheroid,
+as well as their azimuths; our azimuths are the forward horizontal angle between a geographical coordinate
+and @hyperlink["http://en.wikipedia.org/wiki/True_north" "true north"]. Distances are measured in metres,
+and all angles are measured in degrees. Let's measure the distance and compute the azimuths for
+an example pair of coordinates:
 
-@interaction[
+@interaction-eval[
   #:eval ev
   (begin
     (define a 6378137.0)
@@ -200,35 +197,43 @@ our bounding box.
     (define b 6356752.314245))
 ]
 
-@interaction[
+@interaction-eval[
   #:eval ev
   (define (reduced-latitude φ)
     (atan (* (- 1 ƒ)
              (tan φ))))
 ]
 
+@hyperlink[
+  "http://dbpedia.org/page/Battle_of_Vimy_Ridge"
+  "The Battle of Vimy Ridge"
+]:
+
 @interaction[
   #:eval ev
   (define-values (φ1 L1)
-    (values (degrees->radians 50.379)
-            (degrees->radians 2.774)))
+    (values 50.379 2.774))
 ]
+
+@hyperlink[
+  "http://dbpedia.org/page/Battle_of_the_Somme"
+  "The Battle of the Somme"
+]:
 
 @interaction[
   #:eval ev
   (define-values (φ2 L2)
-    (values (degrees->radians 0.0)
-            (degrees->radians 0.0)))
+    (values 50.016666 2.683333))
 ]
 
 @interaction-eval[
   #:eval ev
-  (define L (- L1 L2))
+  (define L (degrees->radians (- L1 L2)))
 ]
 
 @interaction-eval[
   #:eval ev
-  (define precision 0.000000000006)
+  (define precision 0.000000000001)
 ]
 
 @interaction-eval[
@@ -303,7 +308,99 @@ our bounding box.
 
 ]
 
+@interaction-eval[
+  #:eval ev
+  (define (vincenty-inverse)
+    (let* ([λ (for/last ([i (in-producer λ-generator stop-value)]) i)]
+           [U1 (reduced-latitude (degrees->radians φ1))]
+           [U2 (reduced-latitude (degrees->radians φ2))]
+           [sinσ (sqrt (+ (expt (* (cos U2)
+                                   (sin λ))
+                                2)
+                          (expt (- (* (cos U1)
+                                      (sin U2))
+                                   (* (sin U1)
+                                      (cos U2)
+                                      (cos λ)))
+                                   2)))]
+           [cosσ (+ (* (sin U1)
+                       (sin U2))
+                    (* (cos U1)
+                       (cos U2)
+                       (cos λ)))]
+           [σ (atan (/ sinσ cosσ))]
+           [sinα (/ (* (cos U1)
+                       (cos U2)
+                       (sin λ))
+                    sinσ)]
+           [cosα2 (- 1
+                     (expt sinα 2))]
+           [cos2σm (- cosσ
+                      (/ (* 2
+                            (sin U1)
+                            (sin U2))
+                            cosα2))]
+           [u2 (* cosα2
+                  (/ (- (expt a 2)
+                        (expt b 2))
+                        (expt b 2)))]
+           [A (+ 1 (* (/ u2 16384)
+                      (+ 4096
+                         (* u2
+                            (+ -768
+                               (* u2
+                                  (- 320
+                                     (* 175 u2))))))))]
+           [B (* (/ u2 1024)
+                 (+ 256
+                  (* u2
+                     (+ -128
+                        (* u2
+                           (- 74
+                              (* 47 u2)))))))]
+           [Δσ (* B
+                  sinσ
+                  (+ cos2σm
+                     (* (/ 1 4)
+                        B
+                        (- (* cosσ
+                              (+ -1
+                                 (* 2
+                                    (expt cos2σm 2))))
+                           (* (/ 1 6)
+                              B
+                              cos2σm
+                              (+ -3
+                                 (* 4
+                                    (expt sinσ 2)))
+                              (+ -3
+                                 (* 4
+                                    (expt cos2σm 2))))))))]
+           [s (* b
+                 A
+                 (- σ Δσ))]
+           [α1 (atan (/ (* (cos U2)
+                           (sin λ))
+                        (- (* (cos U1)
+                              (sin U2))
+                           (* (sin U1)
+                              (cos U2)
+                              (cos λ)))))]
+           [α2 (atan (/ (* (cos U1)
+                           (sin λ))
+                        (+ (* -1
+                              (sin U1)
+                              (cos U2))
+                           (* (cos U1)
+                              (sin U2)
+                              (cos λ)))))])
+          (values s
+                  (radians->degrees α1)
+                  (radians->degrees α2))))
+]
+
 @interaction[
   #:eval ev
-  (for/last ([i (in-producer λ-generator stop-value)]) i)
+  (vincenty-inverse)
 ]
+
