@@ -51,7 +51,7 @@ as well as their bounding boxes.
 
 @interaction-eval[
   #:eval ev
-  (struct SRTM (file-name x-min x-max y-min y-max) #:transparent)
+  (struct SRTM (file-name min-long max-long min-lat max-lat) #:transparent)
 ]
 
 Now, we need to be able to do two things: efficiently find chunks of SRTM data
@@ -79,12 +79,12 @@ behind the camera. It would be efficient to use a @hyperlink[
             (let* ([coordinates (first (hash-ref (hash-ref feature 'geometry) 'coordinates))]
                    [x-values (map first coordinates)]
                    [y-values (map second coordinates)]
-                   [x-min (apply min x-values)]
-                   [x-max (apply max x-values)]
-                   [y-min (apply min y-values)]
-                   [y-max (apply max y-values)])
+                   [min-long (apply min x-values)]
+                   [max-long (apply max x-values)]
+                   [min-lat (apply min y-values)]
+                   [max-lat (apply max y-values)])
             (SRTM (hash-ref (hash-ref feature 'properties) 'filename)
-                  x-min x-max y-min y-max)))
+                  min-long max-long min-lat max-lat)))
          (filter (λ (feature)
                     (hash-has-key? (hash-ref feature 'properties) 'filename))
                  features)))
@@ -103,7 +103,7 @@ behind the camera. It would be efficient to use a @hyperlink[
                                      geotiff
                                      "data/"))
               (system (string-append "gdal_translate -q -ot Byte -of BMP "
-                                     " -scale 0 256 "
+                                     "-scale 0 256 "
                                      "-outsize 513 513 "
                                      "data/"
                                      (SRTM-file-name srtm)
@@ -128,10 +128,10 @@ behind the camera. It would be efficient to use a @hyperlink[
   #:eval ev
   (define (SRTM-contains? x y)
     (λ (srtm)
-       (and (< (SRTM-x-min srtm) x)
-            (> (SRTM-x-max srtm) x)
-            (< (SRTM-y-min srtm) y)
-            (> (SRTM-y-max srtm) y))))
+       (and (< (SRTM-min-long srtm) x)
+            (> (SRTM-max-long srtm) x)
+            (< (SRTM-min-lat srtm) y)
+            (> (SRTM-max-lat srtm) y))))
 ]
 
 @interaction-eval[
@@ -180,28 +180,18 @@ trench. However, SRTM is the best we have right now, but we'll scale it to 90 ti
 its original resolution, so that elevation data that is returned from a request
 appears to be to scale.
 
-@section{Testing that Chunks of Elevation Data are in our Camera's Field of View}
+First, let's test what chunks of elevation data lie within the bounding box formed
+by the following two geographical coordinates:
 
-We can use @hyperlink["http://en.wikipedia.org/wiki/Vincenty%27s_formulae" "Vincenty's Formula"] to
-compute the ellipsoidal distance between two geographical coordinates on the Earth, the WGS84 spheroid,
-as well as their azimuths; our azimuths are the forward horizontal angle between a geographical coordinate
-and @hyperlink["http://en.wikipedia.org/wiki/True_north" "true north"]. Distances are measured in metres,
-and all angles are measured in degrees. Let's measure the distance and compute the azimuths for
-an example pair of coordinates:
+@hyperlink[
+  "http://dbpedia.org/page/Battle_of_the_Somme"
+  "The Battle of the Somme"
+]:
 
-@interaction-eval[
+@interaction[
   #:eval ev
-  (begin
-    (define a 6378137.0)
-    (define ƒ (/ 1 298.257223563))
-    (define b 6356752.314245))
-]
-
-@interaction-eval[
-  #:eval ev
-  (define (reduced-latitude φ)
-    (atan (* (- 1 ƒ)
-             (tan φ))))
+  (define-values (L1 φ1)
+    (values 2.683333 50.016666))
 ]
 
 @hyperlink[
@@ -211,196 +201,70 @@ an example pair of coordinates:
 
 @interaction[
   #:eval ev
-  (define-values (φ1 L1)
-    (values 50.379 2.774))
-]
-
-@hyperlink[
-  "http://dbpedia.org/page/Battle_of_the_Somme"
-  "The Battle of the Somme"
-]:
-
-@interaction[
-  #:eval ev
-  (define-values (φ2 L2)
-    (values 50.016666 2.683333))
+  (define-values (L2 φ2)
+    (values 2.774 50.379))
 ]
 
 @interaction-eval[
   #:eval ev
-  (define L (degrees->radians (- L1 L2)))
+  (define (SRTM-intersects? min-long min-lat max-long max-lat)
+    (λ (srtm)
+       (and (not (< (SRTM-max-long srtm)
+                    min-long))
+            (not (> (SRTM-min-long srtm)
+                    max-long))
+            (not (< (SRTM-max-lat srtm)
+                    min-lat))
+            (not (> (SRTM-min-lat srtm)
+                    max-lat)))))
 ]
 
 @interaction-eval[
   #:eval ev
-  (define precision 0.000000000001)
-]
+  (define (make-gdal-crop min-long min-lat max-long max-lat)
+    (λ (srtm)
+       (begin (system (string-append "rm -f "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     "_cropped.tif"))
 
-@interaction-eval[
-  #:eval ev
-  (define (λ-prime λ)
-    (let* ([U1 (reduced-latitude φ1)]
-           [U2 (reduced-latitude φ2)]
-           [sinσ (sqrt (+ (expt (* (cos U2)
-                                   (sin λ))
-                                2)
-                          (expt (- (* (cos U1)
-                                      (sin U2))
-                                   (* (sin U1)
-                                      (cos U2)
-                                      (cos λ)))
-                                2)))]
-            [cosσ (+ (* (sin U1)
-                        (sin U2))
-                     (* (cos U1)
-                        (cos U2)
-                        (cos λ)))]
-            [σ (atan (/ sinσ cosσ))]
-            [sinα (/ (* (cos U1)
-                        (cos U2)
-                        (sin λ))
-                     sinσ)]
-            [cosα2 (- 1
-                      (expt sinα 2))]
-            [cos2σm (- cosσ
-                       (/ (* 2
-                             (sin U1)
-                             (sin U2))
-                           cosα2))]
-            [C (* (/ ƒ 16)
-                  cosα2
-                  (+ 4
-                     (* ƒ
-                        (- 4
-                           (* 3 cosα2)))))])
-          (+ λ
-             (* (- 1 C)
-                ƒ
-                sinα
-                (+ σ
-                   (* C
-                      sinσ
-                      (+ cos2σm
-                         (* C
-                            cosσ
-                            (+ -1
-                               (* 2
-                                  (expt cos2σm 2)))))))))))
-]
+              (system (string-append "gdalwarp "
+                                     "-q "
+                                     "-te "
+                                     (number->string min-long)
+                                     " "
+                                     (number->string min-lat)
+                                     " "
+                                     (number->string max-long)
+                                     " "
+                                     (number->string max-lat)
+                                     " "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     ".tif "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     "_cropped.tif"))
 
-@interaction-eval[
-  #:eval ev
-  (begin
-    (require racket/generator)
-    (define stop-value (gensym))
-    (define λ-generator
-      (generator ()
-        (let loop
-             ([diff precision]
-              [λ L])
-             (if (< diff precision)
-                 stop-value
-                 (let ([λ-prime (λ-prime λ)])
-                      (begin
-                        (yield λ-prime)
-                        (loop  (- λ-prime λ)
-                               λ-prime))))))))
-
-]
-
-@interaction-eval[
-  #:eval ev
-  (define (vincenty-inverse)
-    (let* ([λ (for/last ([i (in-producer λ-generator stop-value)]) i)]
-           [U1 (reduced-latitude (degrees->radians φ1))]
-           [U2 (reduced-latitude (degrees->radians φ2))]
-           [sinσ (sqrt (+ (expt (* (cos U2)
-                                   (sin λ))
-                                2)
-                          (expt (- (* (cos U1)
-                                      (sin U2))
-                                   (* (sin U1)
-                                      (cos U2)
-                                      (cos λ)))
-                                   2)))]
-           [cosσ (+ (* (sin U1)
-                       (sin U2))
-                    (* (cos U1)
-                       (cos U2)
-                       (cos λ)))]
-           [σ (atan (/ sinσ cosσ))]
-           [sinα (/ (* (cos U1)
-                       (cos U2)
-                       (sin λ))
-                    sinσ)]
-           [cosα2 (- 1
-                     (expt sinα 2))]
-           [cos2σm (- cosσ
-                      (/ (* 2
-                            (sin U1)
-                            (sin U2))
-                            cosα2))]
-           [u2 (* cosα2
-                  (/ (- (expt a 2)
-                        (expt b 2))
-                        (expt b 2)))]
-           [A (+ 1 (* (/ u2 16384)
-                      (+ 4096
-                         (* u2
-                            (+ -768
-                               (* u2
-                                  (- 320
-                                     (* 175 u2))))))))]
-           [B (* (/ u2 1024)
-                 (+ 256
-                  (* u2
-                     (+ -128
-                        (* u2
-                           (- 74
-                              (* 47 u2)))))))]
-           [Δσ (* B
-                  sinσ
-                  (+ cos2σm
-                     (* (/ 1 4)
-                        B
-                        (- (* cosσ
-                              (+ -1
-                                 (* 2
-                                    (expt cos2σm 2))))
-                           (* (/ 1 6)
-                              B
-                              cos2σm
-                              (+ -3
-                                 (* 4
-                                    (expt sinσ 2)))
-                              (+ -3
-                                 (* 4
-                                    (expt cos2σm 2))))))))]
-           [s (* b
-                 A
-                 (- σ Δσ))]
-           [α1 (atan (/ (* (cos U2)
-                           (sin λ))
-                        (- (* (cos U1)
-                              (sin U2))
-                           (* (sin U1)
-                              (cos U2)
-                              (cos λ)))))]
-           [α2 (atan (/ (* (cos U1)
-                           (sin λ))
-                        (+ (* -1
-                              (sin U1)
-                              (cos U2))
-                           (* (cos U1)
-                              (sin U2)
-                              (cos λ)))))])
-          (values s
-                  (radians->degrees α1)
-                  (radians->degrees α2))))
+              (system (string-append "gdal_translate -q -ot Byte -of BMP "
+                                     "-scale 0 256 "
+                                     "-outsize 513 513 "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     "_cropped.tif "
+                                     "data/"
+                                     (SRTM-file-name srtm)
+                                     "_cropped.bmp")))))
 ]
 
 @interaction[
   #:eval ev
-  (vincenty-inverse)
+  (map (λ (srtm)
+          (begin
+            (SRTM-download srtm)
+            ((make-gdal-crop L1 φ1 L2 φ2) srtm)
+            srtm))
+       (filter (SRTM-intersects? L1 φ1 L2 φ2)
+               SRTMs))
 ]
 
