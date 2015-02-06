@@ -124,23 +124,6 @@ behind the camera. It would be efficient to use a @hyperlink[
                      gdal-translate)))
 ]
 
-@interaction-eval[
-  #:eval ev
-  (define (SRTM-contains? x y)
-    (λ (srtm)
-       (and (< (SRTM-min-long srtm) x)
-            (> (SRTM-max-long srtm) x)
-            (< (SRTM-min-lat srtm) y)
-            (> (SRTM-max-lat srtm) y))))
-]
-
-@interaction-eval[
-  #:eval ev
-  (map SRTM-download
-       (filter (SRTM-contains? 2.774 50.379)
-               SRTMs))
-]
-
 Whenever we import terrain into Unity3D, we need to make sure that it is
 scaled correctly: i.e. Vimy Ridge should look correctly-scaled when
 viewed through the camera in our scene. Our camera has a perspective projection;
@@ -221,49 +204,67 @@ by the following two geographical coordinates:
 
 @interaction-eval[
   #:eval ev
-  (define (make-gdal-crop min-long min-lat max-long max-lat)
-    (λ (srtm)
-       (begin (system (string-append "rm -f "
-                                     "data/"
-                                     (SRTM-file-name srtm)
-                                     "_cropped.tif"))
+  (define target-resolution (/ 0.000833333333333 90))
+]
 
-              (system (string-append "gdalwarp "
-                                     "-q "
-                                     "-te "
-                                     (number->string min-long)
-                                     " "
-                                     (number->string min-lat)
-                                     " "
-                                     (number->string max-long)
-                                     " "
-                                     (number->string max-lat)
-                                     " "
-                                     "data/"
-                                     (SRTM-file-name srtm)
-                                     ".tif "
-                                     "data/"
-                                     (SRTM-file-name srtm)
-                                     "_cropped.tif"))
+@interaction-eval[
+  #:eval ev
+  (require pict)
+]
 
-              (system (string-append "gdal_translate -q -ot Byte -of BMP "
-                                     "-scale 0 256 "
-                                     "-outsize 513 513 "
-                                     "data/"
-                                     (SRTM-file-name srtm)
-                                     "_cropped.tif "
-                                     "data/"
-                                     (SRTM-file-name srtm)
-                                     "_cropped.bmp")))))
+@interaction-eval[
+  #:eval ev
+  (define (SRTM-intersection srtm min-long min-lat max-long max-lat)
+    (begin
+      (SRTM-download srtm)
+
+      (system (string-append "rm -f "
+                             "data/"
+                             (SRTM-file-name srtm)
+                             "_cropped.tif"))
+
+      (system (string-append "gdalwarp "
+                             "-q "
+                             "-r cubicspline "
+                             "-tr "
+                             (number->string target-resolution)
+                             " "
+                             (number->string (* -1 target-resolution))
+                             " "
+                             "-te "
+                             (number->string min-long)
+                             " "
+                             (number->string min-lat)
+                             " "
+                             (number->string max-long)
+                             " "
+                             (number->string max-lat)
+                             " "
+                             "data/"
+                             (SRTM-file-name srtm)
+                             ".tif "
+                             "data/"
+                             (SRTM-file-name srtm)
+                             "_cropped.tif"))
+
+      (system (string-append "gdal_translate -q -ot Byte -of BMP "
+                             "-scale 0 2200 "
+                             "-outsize 129 129 "
+                             "data/"
+                             (SRTM-file-name srtm)
+                             "_cropped.tif "
+                             "data/"
+                             (SRTM-file-name srtm)
+                             "_cropped.bmp"))
+
+      (bitmap (string-append (SRTM-file-name srtm)
+                             "_cropped.bmp"))))
 ]
 
 @interaction[
   #:eval ev
   (map (λ (srtm)
-          (begin
-            (SRTM-download srtm)
-            ((make-gdal-crop L1 φ1 L2 φ2) srtm)
-            srtm))
+          (SRTM-intersection srtm L1 φ1 L2 φ2))
        (filter (SRTM-intersects? L1 φ1 L2 φ2)
                SRTMs))
 ]
