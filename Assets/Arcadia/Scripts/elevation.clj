@@ -7,7 +7,7 @@
 (def base-url "http://localhost:8000/")
 
 (defn get-height-map
-  "Takes values for min/max longitude and latitudes. Produces a texture 2d of height data."
+  "Takes values for min/max longitude and latitudes. Produces a 2d texture of height data."
   [min-long min-lat max-long max-lat]
   (. (muninn/GET (str base-url
                       "?minlong="
@@ -23,41 +23,59 @@
 (defn texture->grayscales
   "Takes a 2d texture; produces a list of grayscale values of its colors (floats)."
   [texture]
-  (map (fn [[x y]]
-           (.grayscale (.GetPixel texture x y)))
+  (map (fn [[x z]]
+           (.grayscale (.GetPixel texture x z)))
        (muninn/grid (.width texture)
                     (.height texture))))
 
-(defn texture->terrain-data
-  "Takes a 2d texture; produces a terrain data object."
+(defn texture->vertices
+  "Takes a 2d texture; produces a list of vertices."
   [texture]
-  (let [terrain-data (TerrainData.)
-        height-map-resolution 512
-        base-map-resolution 1024
-        width (.width texture)
-        length (.height texture)
-        height 256]
-    (do (set! (.size terrain-data)
-              (Vector3. width height length))
-        (set! (.heightmapResolution terrain-data)
-              height-map-resolution)
-        (set! (.baseMapResolution terrain-data)
-              base-map-resolution)
-        (.SetHeights terrain-data 0 0
-                     (JaggedToMultidimensional/ConvertFloats
-                       (into-array
-                         (map float-array
-                              (partition (.width texture)
-                                         (texture->grayscales texture))))))
-        terrain-data)))
+  (map (fn [[x z]]
+           (Vector3. x
+                     (* (.grayscale (.GetPixel texture x z)) 145)
+                     z))
+       (muninn/grid (.width texture)
+                    (.height texture))))
 
-(defn get-terrain
-  "Takes values for min/max longitude and latitudes. Produces a terrain game object."
-  [min-long min-lat max-long max-lat]
-  (let [height-map (get-height-map min-long min-lat max-long max-lat)
-        terrain-data (texture->terrain-data height-map)]
-    (Terrain/CreateTerrainGameObject terrain-data)))
+(defn texture->uvs
+  "Takes a 2d texture; produces a list of normals."
+  [texture]
+  (map (fn [[x z]]
+         (Vector2. (* x
+                      (/ 1
+                         (max (dec (.width texture)) 1)))
+                   (*  z
+                      (/ 1
+                         (max (dec (.height texture)) 1)))))
+       (muninn/grid (.width texture)
+                    (.height texture))))
 
-(defcomponent Elevation [^float min-long ^float min-lat ^float max-long ^float max-lat]
+(defn texture->triangle-indices
+  "Takes a 2d texture; produces a list of triangle indices."
+  [texture]
+  (muninn/plane-triangle-indices (.width texture)
+                                 (.height texture)))
+
+(defn texture->plane
+  "Takes a 2d texture; produces a plane mesh."
+  [texture]
+  (let [mesh (Mesh.)
+        plane (GameObject.)]
+    (do (set! (.vertices mesh)
+              (into-array (texture->vertices texture)))
+        (set! (.uv mesh)
+              (into-array (texture->uvs texture)))
+        (set! (.triangles mesh)
+              (int-array (texture->triangle-indices texture)))
+        (.RecalculateNormals mesh)
+        (.RecalculateBounds mesh)
+        (set! (.mesh (.AddComponent plane "MeshFilter")) mesh)
+        (.AddComponent plane "MeshRenderer")
+        plane)))
+
+(defcomponent Elevation [^UnityEngine.Texture2D height-map ^float min-long ^float min-lat ^float max-long ^float max-lat]
   (Start [this]
-         (get-terrain min-long min-lat max-long max-lat)))
+         (do (set! (. this height-map)
+                   (get-height-map min-long min-lat max-long max-lat))
+             (texture->plane (. this height-map)))))

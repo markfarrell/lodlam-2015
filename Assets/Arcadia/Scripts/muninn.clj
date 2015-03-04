@@ -16,12 +16,60 @@
         client))
 
 (defn grid
-      "Create a width by height grid of points. e.g. (grid 2 2) => ([0 0] [0 1] [1 0] [1 1])"
-      [width height]
-      (mapcat (fn [i]
-                  (map (fn [j] [i j])
-                       (range height)))
-              (range width)))
+  [width length]
+  (mapcat (fn [j]
+            (map (fn [i] [i j])
+                 (range width)))
+          (range length)))
+
+(defn plane-triangle-indices
+  [width length]
+  (mapcat
+    (fn [[x z]]
+      (list (+ (* z width) x)
+            (+ (* (inc z) width) x)
+            (+ (* z width)
+               (inc x))
+            (+ (* (inc z) width) x)
+            (+ (* (inc z) width)
+               (inc x))
+            (+ (* z width)
+               (inc x))))
+    (grid (dec width)
+          (dec length))))
+
+(defn plane-vertices
+  [width length]
+  (map (fn [[x z]]
+           (Vector3. x 0.0 z))
+       (grid width length)))
+
+(defn plane-uvs
+  [width length]
+    (map (fn [[x z]]
+           (Vector2. (* x
+                        (/ 1
+                           (max (dec width) 1)))
+                     (*  z
+                        (/ 1
+                           (max (dec length) 1)))))
+         (grid width length)))
+
+(defn create-plane
+  [width length]
+  (let [mesh  (Mesh.)
+        plane (GameObject.)]
+    (do (set! (.vertices mesh)
+              (into-array (plane-vertices width length)))
+        (set! (.uv mesh)
+              (into-array (plane-uvs width length)))
+        (set! (.triangles mesh)
+              (int-array (plane-triangle-indices width length)))
+        (.RecalculateNormals mesh)
+        (.RecalculateBounds mesh)
+        (set! (.mesh (.AddComponent plane "MeshFilter")) mesh)
+        (.AddComponent plane "MeshRenderer")
+        plane)))
 
 (defn set-main-texture!
       "Expects a GameObject; sets main texture."
