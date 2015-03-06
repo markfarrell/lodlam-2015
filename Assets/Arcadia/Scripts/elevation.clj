@@ -6,6 +6,9 @@
 
 (def base-url "http://localhost:8000/")
 
+(def partition-width 254)
+(def partition-length 254)
+
 (defn get-height-map
   "Takes values for min/max longitude and latitudes. Produces a 2d texture of height data."
   [min-long min-lat max-long max-lat]
@@ -46,8 +49,8 @@
                (inc x))
             (+ (* z width)
                (inc x))))
-    (grid (dec width)
-          (dec length))))
+    (muninn/grid (dec width)
+                 (dec length))))
 
 (defn plane-vertices
   [width length height-at]
@@ -55,7 +58,7 @@
            (Vector3. x
                      (height-at x z)
                      z))
-       (grid width length)))
+       (muninn/grid width length)))
 
 (defn plane-uvs
   [width length]
@@ -66,7 +69,7 @@
                      (*  z
                         (/ 1
                            (max (dec length) 1)))))
-         (grid width length)))
+         (muninn/grid width length)))
 
 (defn create-terrain
   "Takes collections of vertices, uvs and triangle indices; produces a game object."
@@ -90,15 +93,15 @@
 (defn texture->terrain
   "Takes a 2d texture; produces a game object."
   [texture]
-  (let [width (min (.width texture) 254)
-        length (min (.height texture) 254)
+  (let [width (min (.width texture) partition-width)
+        length (min (.height texture) partition-length)
         vertices (texture->vertices texture width length)
-        uvs (muninn/plane-uvs width length)
-        triangle-indices (muninn/plane-triangle-indices width length)]
+        uvs (plane-uvs width length)
+        triangle-indices (plane-triangle-indices width length)]
     (create-terrain vertices uvs triangle-indices)))
 
-(defcomponent Elevation [^UnityEngine.Texture2D height-map ^float min-long ^float min-lat ^float max-long ^float max-lat]
+(defcomponent Elevation [^float min-long ^float min-lat ^float max-long ^float max-lat]
   (Start [this]
-         (do (set! (. this height-map)
-                   (get-height-map min-long min-lat max-long max-lat))
-             (texture->terrain (. this height-map)))))
+         (map texture->terrain
+              (muninn/texture-partitions
+                (get-height-map min-long min-lat max-long max-lat) partition-width partition-height))))
