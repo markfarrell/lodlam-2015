@@ -1,19 +1,19 @@
 (ns muninn
-    (:use arcadia.core)
-    (:import [UnityEngine Debug]))
+  (:use arcadia.core)
+  (:import [UnityEngine Debug]))
 
 (defn url-encode
-      "Encodes a URL string."
-      [str]
-      (System.Web.HttpUtility/UrlEncode str))
+  "Encodes a URL string."
+  [str]
+  (System.Web.HttpUtility/UrlEncode str))
 
 (defn GET
-      "Start a download from the URL; wait to finish; produce UnityEngine.WWW object."
-      [url]
-      (let [client (WWW. url)]
-        (do
-          (some true? (repeatedly #(. client isDone)))) ; Wait to finish
-        client))
+  "Start a download from the URL; wait to finish; produce UnityEngine.WWW object."
+  [url]
+  (let [client (WWW. url)]
+    (do
+      (some true? (repeatedly #(. client isDone)))) ; Wait to finish
+    client))
 
 (defn grid
   [width length]
@@ -72,8 +72,18 @@
                         partition-width
                         partition-length)))
 
+(defn grid-partitions-positions
+  [grid-width grid-length partition-width partition-length]
+  (map
+    (fn [grid-partition]
+      (let [xs (map (fn [[x z]] x) grid-partition)
+            zs (map (fn [[x z]] z) grid-partition)]
+        [(max (dec (apply min xs)) 0)
+         (max (dec (apply min zs)) 0)]))
+    (grid-partitions grid-width grid-length partition-width partition-length)))
+
 (defn set-main-texture!
-      "Expects a GameObject; sets main texture."
-      [game-object texture]
-      (set! (. (. (. game-object renderer) material) mainTexture)
+  "Expects a GameObject; sets main texture."
+  [game-object texture]
+  (set! (. (. (. game-object renderer) material) mainTexture)
         texture))

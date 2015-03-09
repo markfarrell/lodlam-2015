@@ -9,6 +9,10 @@
 (def partition-width 254)
 (def partition-length 254)
 
+(def x-scale 90.0)
+(def y-scale (* 145.0 20))
+(def z-scale 90.0)
+
 (defn get-height-map
   "Takes values for min/max longitude and latitudes. Produces a 2d texture of height data."
   [min-long min-lat max-long max-lat]
@@ -26,15 +30,12 @@
 (defn texture->vertices
   "Takes a 2d texture; produces a list of vertices."
   [texture width length]
-  (let [y-scale (* 145.0 10.0)
-        x-scale 90
-        z-scale 90]
-    (map (fn [[x z]]
-             (Vector3. (* x x-scale)
-                       (* (.grayscale (.GetPixel texture x z)) y-scale)
-                       (* z z-scale)))
-         (muninn/grid width
-                      length))))
+  (map (fn [[x z]]
+         (Vector3. (* x x-scale)
+                   (* (.grayscale (.GetPixel texture x z)) y-scale)
+                   (* z z-scale)))
+       (muninn/grid width
+                    length)))
 
 (defn plane-triangle-indices
   [width length]
@@ -88,6 +89,7 @@
         (set! (.material (.AddComponent plane "MeshRenderer"))
               (UnityEngine.Resources/Load "Terrain" UnityEngine.Material))
         (.AddComponent plane "MeshCollider")
+        (set! (.name plane) "Terrain")
         plane)))
 
 (defn texture->terrain
@@ -100,8 +102,23 @@
         triangle-indices (plane-triangle-indices width length)]
     (create-terrain vertices uvs triangle-indices)))
 
+(defn create-terrains
+  [min-long min-lat max-long max-lat]
+  (let [height-map (get-height-map min-long min-lat max-long max-lat)
+        texture-partitions (muninn/texture-partitions height-map partition-width partition-length)
+        terrain-objects (map texture->terrain texture-partitions)
+        terrain-positions (muninn/grid-partitions-positions (.width height-map)
+                                                            (.height height-map)
+                                                            partition-width
+                                                            partition-length)]
+    (map (fn [[terrain-object [x z]]]
+           (do (.Translate (.transform terrain-object)
+                           (* x x-scale)
+                           0
+                           (* z z-scale))
+               terrain-object))
+         (map vector terrain-objects terrain-positions))))
+
 (defcomponent Elevation [^float min-long ^float min-lat ^float max-long ^float max-lat]
   (Start [this]
-         (map texture->terrain
-              (muninn/texture-partitions
-                (get-height-map min-long min-lat max-long max-lat) partition-width partition-height))))
+         (create-terrains min-long min-lat max-long max-lat)))
