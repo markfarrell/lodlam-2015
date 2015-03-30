@@ -63,6 +63,27 @@
         (.Apply new-texture false)
         new-texture)))
 
+(defn expand-grid
+  [original-grid]
+  (let [width (grid-width original-grid)
+        length (grid-length original-grid)
+        min-x (apply min (map (fn [[x z]] x) original-grid))
+        min-z (apply min (map (fn [[x z]] z) original-grid))]
+    (map (fn [[x z]]
+           [(+ min-x x)
+            (+ min-z z)])
+         (grid (inc width)
+               (inc length)))))
+
+(defn crop-grid
+  [grid min-x min-z max-x max-z]
+  (filter (fn [[x z]]
+            (and (>= x min-x)
+                 (>= z min-z)
+                 (<= x max-x)
+                 (<= z max-z)))
+          grid))
+
 (defn texture-partitions
   [texture partition-width partition-length]
   (map (fn [grid]

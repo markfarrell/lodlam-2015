@@ -17,7 +17,23 @@
   "Takes values for min/max longitude and latitudes. Produces a 2d texture of height data."
   [min-long min-lat max-long max-lat]
   (. (muninn/GET (str base-url
-                      "?minlong="
+                      "utm?"
+                      "minlong="
+                      min-long
+                      "&minlat="
+                      min-lat
+                      "&maxlong="
+                      max-long
+                      "&maxlat="
+                      max-lat))
+     texture))
+
+(defn get-trench-map
+  "Takes values for min/max longitude and latitudes. Produces a 2d texture of trench data."
+  [min-long min-lat max-long max-lat]
+  (. (muninn/GET (str base-url
+                      "utm/trenches?"
+                      "minlong="
                       min-long
                       "&minlat="
                       min-lat
@@ -106,8 +122,8 @@
   [texture]
   (let [width (.width texture)
         length (.height texture)]
-  (vertices->terrain
-    (texture->vertices texture width length) width length)))
+    (vertices->terrain
+      (texture->vertices texture width length) width length)))
 
 (defn color-clamp
   [x]
