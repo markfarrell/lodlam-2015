@@ -138,6 +138,7 @@
                       1.0))
       plane)))
 
+;; (: make-url (-> String String))
 (defn make-url
   "Expects a SPARQL query; produces a Gutenberg URL."
   [query]
@@ -152,12 +153,26 @@
        "&debug="
        sparql-debug))
 
+;; (: search (-> String JSExpr))
 (defn search
   "Execute SPARQL query; produces a JSON object."
   [sparql-query]
   (let [url (make-url sparql-query)]
     (json/read-str (. (muninn/GET url) text))))
 
+;; (: books (-> JSExpr))
 (defn books
   []
   (search sparql-query))
+
+(defn random-title
+  []
+  (let [bindings (get (get (books) "results") "bindings")
+        titles (map (fn [binding] (get (get binding "title") "value")) bindings)]
+    (rand-nth titles)))
+
+(defcomponent BookCover
+  []
+  (Start [this]
+         (muninn/set-main-texture! this
+                                   (text->texture (random-title)))))
