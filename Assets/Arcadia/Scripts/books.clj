@@ -1,6 +1,7 @@
 (ns books
   (:use arcadia.core)
   (:require [muninn])
+  (:require [clojure.string :as string])
   (:require [clojure.data.json :as json]))
 
 ;; (: sparql-url String)
@@ -36,6 +37,9 @@
 ;; (: atlas (Listof JSExpr))
 (def atlas
   (get (get (clojure.data.json/read-str (.text (UnityEngine.Resources/Load "font_atlas"))) "chars") "char"))
+
+;; (: default-color Color)
+(def default-color UnityEngine.Color/white)
 
 ;; (: text->atlas (-> String (Listof JSExpr)))
 (defn text->atlas
@@ -109,7 +113,7 @@
     (do
       (doseq [x (range (.width new-texture))
               y (range (.height new-texture))]
-        (.SetPixel new-texture x y UnityEngine.Color/white))
+        (.SetPixel new-texture x y default-color))
       (doseq
         [[[x y] [xoffset yoffset] [width height pixels]]
          (map vector
@@ -165,14 +169,43 @@
   []
   (search sparql-query))
 
-(defn random-title
-  []
-  (let [bindings (get (get (books) "results") "bindings")
-        titles (map (fn [binding] (get (get binding "title") "value")) bindings)]
-    (rand-nth titles)))
+(defn random-book
+  [search-result]
+  (let [bindings (get (get search-result "results") "bindings")
+        titles (map (fn [binding] (get (get binding "title") "value")) bindings)
+        versions (map (fn [binding] (get (get binding "version") "value")) bindings)
+        gutenberg "http://www.gutenberg.org/dirs/"
+        gutenberg-mirror "http://trenchfoot.cs.uwaterloo.ca/gutenberg/"
+        mirror-versions (map (fn [version] (string/replace version gutenberg gutenberg-mirror)) versions)]
+    (rand-nth (map vector titles mirror-versions))))
 
 (defcomponent BookCover
-  []
+  [^String title ^String text ^boolean show-text? ^UnityEngine.Vector2 scroll-position]
   (Start [this]
-         (muninn/set-main-texture! this
-                                   (text->texture (random-title)))))
+         (do
+           (let [[title version] (random-book (books))]
+             (do
+               (set! (. this title) title)
+               (set! (. this text)
+                     (. (muninn/GET version) text))
+               (muninn/set-main-texture! this
+                                         (text->texture title))))))
+  (OnGUI [this]
+         (if show-text?
+           (do
+             (UnityEngine.GUILayout/BeginArea
+               (UnityEngine.Rect. (int 0)
+                                  (int 0)
+                                  (int UnityEngine.Screen/width)
+                                  (int UnityEngine.Screen/height)))
+             (set! (. this scroll-position)
+                   (UnityEngine.GUILayout/BeginScrollView
+                     scroll-position
+                     (into-array
+                       UnityEngine.GUILayoutOption
+                       [(UnityEngine.GUILayout/MaxHeight (float UnityEngine.Screen/height))])))
+             (UnityEngine.GUILayout/Label
+               (. this text)
+               (UnityEngine.GUILayout/ExpandHeight (boolean true)))
+             (UnityEngine.GUILayout/EndScrollView)
+             (UnityEngine.GUILayout/EndArea)))))

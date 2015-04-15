@@ -79,22 +79,29 @@
     (/ (. texture width)
        (. texture height))))
 
-(defn paint!
-  [game-object year-from year-to]
-  (let [page 1
-        search-result (search year-from year-to page)
-        count (second (find search-result "count"))
-        new-texture
-        (get-texture-2d
-          (first (thumbnail-urls
-                   (search year-from
-                           year-to
-                           (rand-int (+ 1 count))))))]
-    (do
-      (muninn/set-main-texture! game-object new-texture)
-      game-object)))
-
+;; Painting Component - with a workaround due to coroutine support currently missing in Clojure.
 (defcomponent Painting
-  [^int year-from ^int year-to]
+  [^WWW count-www ^WWW selection-www ^boolean count-www-done ^boolean selection-www-done ^int year-from ^int year-to]
   (Start [this]
-         (paint! this year-from year-to)))
+         (do
+           (muninn/set-main-texture! this
+                                     (UnityEngine.Resources/Load "muninn"))
+           (set! count-www
+                 (WWW. (make-url year-from year-to 1)))))
+  (Update [this]
+          (do
+            (if (and (not count-www-done)
+                     (.isDone count-www))
+              (let [search-result (json/read-str (. count-www text))
+                    count (second (find search-result "count"))]
+                (do (set! count-www-done (boolean true))
+                    (set! selection-www (WWW. (make-url year-from year-to
+                                                        (rand-int (+ 1 count))))))))
+            (if (and count-www-done
+                     (not selection-www-done)
+                     (.isDone selection-www))
+              (let [search-result (json/read-str (. selection-www text))
+                    new-texture (get-texture-2d (first (thumbnail-urls search-result)))]
+                (do (set! selection-www-done (boolean true))
+                    (muninn/set-main-texture! this new-texture)))))))
+
