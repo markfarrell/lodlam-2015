@@ -2,11 +2,13 @@
   (:use arcadia.core)
   (:import [UnityEngine Debug]))
 
+;; (: url-encode (-> String String))
 (defn url-encode
   "Encodes a URL string."
   [str]
   (System.Web.HttpUtility/UrlEncode str))
 
+;; (: GET (-> String WWW))
 (defn GET
   "Start a download from the URL; wait to finish; produce UnityEngine.WWW object."
   [url]
@@ -15,6 +17,7 @@
       (some true? (repeatedly #(. client isDone)))) ; Wait to finish
     client))
 
+;; (: grid (-> Int Int (Listof (Vector Int Int))))
 (defn grid
   [width length]
   (mapcat (fn [j]
