@@ -169,6 +169,7 @@
   []
   (search sparql-query))
 
+;; (: random-book (-> JSExpr (Vector String String)))
 (defn random-book
   [search-result]
   (let [bindings (get (get search-result "results") "bindings")
