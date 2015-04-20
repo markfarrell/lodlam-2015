@@ -176,20 +176,23 @@
         versions (map (fn [binding] (get (get binding "version") "value")) bindings)
         gutenberg "http://www.gutenberg.org/dirs/"
         gutenberg-mirror "http://trenchfoot.cs.uwaterloo.ca/gutenberg/"
-        mirror-versions (map (fn [version] (string/replace version gutenberg gutenberg-mirror)) versions)]
-    (rand-nth (map vector titles mirror-versions))))
+        mirror-versions (map (fn [version] (string/replace version gutenberg gutenberg-mirror)) versions)
+        random-book-thumbnail-and-version (rand-nth (map vector titles mirror-versions))]
+    (do (UnityEngine.Debug/Log random-book-thumbnail-and-version)
+        random-book-thumbnail-and-version)))
 
 (defcomponent BookCover
   [^String title ^String text ^boolean show-text? ^UnityEngine.Vector2 scroll-position]
   (Start [this]
          (do
-           (let [[title version] (random-book (books))]
+           (let [[title version] (random-book (books))
+                 short-title (first (string/split title #"\\n"))]
              (do
-               (set! (. this title) title)
+               (set! (. this title) short-title)
                (set! (. this text)
                      (. (muninn/GET version) text))
                (muninn/set-main-texture! this
-                                         (text->texture title))))))
+                                         (text->texture short-title))))))
   (OnGUI [this]
          (if show-text?
            (do

@@ -1,5 +1,6 @@
 Temp/
 Library/
+
 ExportedObj/
 obj/
 *.svd
@@ -11,6 +12,7 @@ obj/
 *.user
 *.unityproj
 *.booproj
+
 .DS_Store
 .DS_Store?
 ._*

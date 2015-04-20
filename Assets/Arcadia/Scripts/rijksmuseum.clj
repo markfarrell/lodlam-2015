@@ -94,7 +94,7 @@
                      (.isDone count-www))
               (let [search-result (json/read-str (. count-www text))
                     count (second (find search-result "count"))]
-                (do (set! count-www-done (boolean true))
+                (do  (set! count-www-done (boolean true))
                     (set! selection-www (WWW. (make-url year-from year-to
                                                         (rand-int (+ 1 count))))))))
             (if (and count-www-done
@@ -102,6 +102,7 @@
                      (.isDone selection-www))
               (let [search-result (json/read-str (. selection-www text))
                     new-texture (get-texture-2d (first (thumbnail-urls search-result)))]
-                (do (set! selection-www-done (boolean true))
+                (do (UnityEngine.Debug/Log search-result)
+                    (set! selection-www-done (boolean true))
                     (muninn/set-main-texture! this new-texture)))))))
 

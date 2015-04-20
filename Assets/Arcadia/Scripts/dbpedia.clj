@@ -27,8 +27,10 @@
 (defn search
       "Execute SPARQL query; produces a JSON object."
       [sparql-query]
-      (let [url (make-url sparql-query)]
-        (json/read-str (. (muninn/GET url) text))))
+      (let [url (make-url sparql-query)
+            search-result (json/read-str (. (muninn/GET url) text))]
+        (do (UnityEngine.Debug/Log search-result)
+            search-result)))
 
 (defn thumbnail-urls
       "Expects a search result; produces thumbnail urls."

@@ -29,9 +29,13 @@
 (defn rand-thumbnail-url
   "Get a random thumbnail URL."
   [year-from year-to]
-  (rand-nth
-    (dbpedia/thumbnail-urls
-      (dbpedia/search (sparql-query year-from year-to)))))
+  (let [random-thumbnail-url
+        (rand-nth
+          (dbpedia/thumbnail-urls
+            (dbpedia/search (sparql-query year-from year-to))))]
+    (do
+      (UnityEngine.Debug/Log random-thumbnail-url)
+      random-thumbnail-url)))
 
 (defn instantiate-grid!
   "Spawn a grid of GameObject clones."
