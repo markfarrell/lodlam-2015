@@ -2,10 +2,9 @@
 
 The Muninn Project's submission for the [LODLAM 2015 Challenge](http://summit2015.lodlam.net/challenge/) competition.
 
-## Tools
+## How to Use
 
-* [Unity 4.6](http://unity3d.com/)
-* [Arcadia/Clojure](https://github.com/arcadia-unity/Arcadia)
+Open as a project in [Unity 4.6](http://unity3d.com/). This project uses the [Arcadia/Clojure](https://github.com/arcadia-unity/Arcadia) plugin for Unity, included in this project.
 
 ## Scripts
 
