@@ -1,6 +1,9 @@
 # LODLAM 2015 Challenge
 
-The Muninn Project's submission for the [LODLAM 2015 Challenge](http://summit2015.lodlam.net/challenge/) competition.
+The Muninn Project's submission for the [LODLAM 2015 Challenge](http://summit2015.lodlam.net/2015/04/21/challenge-entry-the-muninn-project/) competition.
+
+Muninn Project Website http://www.muninn-project.org/
+Muninn Project SPARQL/Ontologies server http://rdf.muninn-project.org/
 
 ## How to Use
 
